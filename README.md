@@ -1,19 +1,65 @@
-# DawnCraft-MOD
-ChatGPTを使用して試作したDawnCraft 2.0.16 / Minecraft Forge 1.18.2 向けの非公式リアルタイム日本語化支援MODです。使用にはDeepLAPIキーが必要です。APIキーの取得方法についてはご自身で調べてください。
-DawnCraft 2.0.16 / Minecraft Forge 1.18.2 向けの試作日本語化MODです。一度英文が表示されたあと日本語に置換されます。
+# Dawn Auto Translator
 
-※一時の欲でChatGPTを使い作成したMODです。万が一当MODを導入して不具合が生じても対応しません。というか知識がないので恐らく対応できません。文字化けやクラッシュ等不具合が起き、ゲームの進行を妨げるような場合は直ちにmodsから削除してください。
-完全に「現状有姿（現状渡し）」での公開となります。導入はすべて自己責任でお願いいたします。
-DawnCraft本体は含まれていません。
-APIキーは他人に共有しないでください。
+ChatGPTを使用して試作した、DawnCraft 2.0.16 / Minecraft Forge 1.18.2 向けの非公式リアルタイム日本語化支援MODです。
 
+DeepL APIを使用して、NPC会話・クエスト・チャットなどをリアルタイム翻訳します。
 
-## インストール
+※ 使用には DeepL APIキー が必要です。取得方法については各自でご確認ください。
 
-.jarをcurseforge\minecraft\Instances\DawnCraft - Echoes of Legends\mods内に入れ一度ゲームを起動すると、curseforge\minecraft\Instances\DawnCraft - Echoes of Legends\config内にdawnautotranslatorが生成されますのでdawnautotranslator内のconfig.propertiesを編集してDeepL APIキーを貼り付けてください。
+---
 
-以下を編集してください。
-`config/dawnautotranslator/config.properties`
+## 対応環境
+
+* Minecraft Forge 1.18.2
+* DawnCraft 2.0.16
+
+---
+
+## 主な機能
+
+* NPC会話翻訳
+* クエスト翻訳
+* チャット翻訳
+* ツールチップ翻訳
+* JEI翻訳
+* 翻訳キャッシュ
+* DeepL Free / Pro 対応
+
+---
+
+## 注意事項
+
+このMODは個人制作の試作MODです。
+
+ChatGPTを使用して作成しているため、予期しない不具合・翻訳ミス・クラッシュ・文字化け等が発生する可能性があります。
+
+ゲーム進行に支障が出る場合は、直ちにMODを削除してください。
+
+完全に「現状有姿（現状渡し）」での公開となります。
+導入・使用はすべて自己責任でお願いします。
+
+* DawnCraft本体は含まれていません
+* APIキーは絶対に他人へ共有しないでください
+
+---
+
+## インストール方法
+
+1. `.jar` ファイルを以下へ配置
+
+```txt
+curseforge\minecraft\Instances\DawnCraft - Echoes of Legends\mods
+```
+
+2. 一度ゲームを起動
+
+3. 以下が生成されます
+
+```txt
+config/dawnautotranslator/config.properties
+```
+
+4. `config.properties` を編集し、DeepL APIキーを入力してください
 
 ```properties
 enabled=true
@@ -22,13 +68,14 @@ translateChat=true
 showAsyncChatTranslations=true
 deeplApiKey=ここにDeepL APIキー
 ```
-APIキーの取得方法についてはご自身で調べてください。
 
+---
 
-### 設定
-翻訳箇所を詳しく設定したい方向けに。
+## 詳細設定
 
-`config/dawnautotranslator/config.properties` で以下を切り替えできます。
+`config/dawnautotranslator/config.properties`
+
+内で以下を切り替えできます。
 
 ```properties
 translateTooltips=true
@@ -37,6 +84,20 @@ translateJei=true
 translateNpc=true
 ```
 
-※ 画面によってはMOD側の描画方法が特殊で、初回は英文のまま・2回目以降キャッシュで置換、またはログ記録のみになる場合があります。
+---
 
+## 補足
 
+MOD側の描画仕様によっては、
+
+* 初回のみ英文表示
+* 2回目以降キャッシュ翻訳
+* 一部画面はログ記録のみ
+
+となる場合があります。
+
+---
+
+## License
+
+MIT License
