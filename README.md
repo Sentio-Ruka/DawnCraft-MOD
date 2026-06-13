@@ -1,0 +1,2 @@
+# DawnCraft-MOD
+DawnCraft内の英語をリアルタイムで日本語化するMODです。使用にはDeepLAPIキーが必要です。
