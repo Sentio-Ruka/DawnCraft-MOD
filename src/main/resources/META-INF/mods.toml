@@ -1,0 +1,8 @@
+modLoader="javafml"
+loaderVersion="[40,)"
+license="MIT"
+[[mods]]
+modId="dawnautotranslator"
+version="1.4.0-all-in-one"
+displayName="Dawn Auto Translator v1.4 all-in-one"
+description='''Prototype client-side auto translator for untranslated English GUI/chat strings in DawnCraft/Forge 1.18.2.'''

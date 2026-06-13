@@ -1,0 +1,9 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.ruka.dawnautotranslator.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "dawnautotranslator.refmap.json",
+  "client": ["LanguageMixin", "FontMixin", "GuiComponentMixin", "ChatComponentMixin"],
+  "injectors": {"defaultRequire": 0}
+}

@@ -1,0 +1,51 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'net.minecraftforge.gradle' version '5.1.+'
+    id 'org.spongepowered.mixin' version '0.7.+'
+}
+
+group = 'com.ruka'
+version = '1.4.0-all-in-one'
+archivesBaseName = 'dawn-auto-translator'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'official', version: '1.18.2'
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'debug'
+            mods { dawnautotranslator { source sourceSets.main } }
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories { }
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.18.2-40.2.17'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+mixin {
+    add sourceSets.main, 'dawnautotranslator.refmap.json'
+    config 'dawnautotranslator.mixins.json'
+}
+
+jar {
+    manifest {
+        attributes([
+            'Specification-Title': 'dawnautotranslator',
+            'Specification-Vendor': 'ruka',
+            'Specification-Version': '1',
+            'Implementation-Title': project.name,
+            'Implementation-Version': project.jar.archiveVersion,
+            'Implementation-Vendor': 'ruka',
+            'MixinConfigs': 'dawnautotranslator.mixins.json'
+        ])
+    }
+}
