@@ -83,6 +83,10 @@ public final class Translator {
                         "patchouliSafeMode=true\n" +
                         "# NPC会話の翻訳が横にはみ出る場合は小さくしてください。\n" +
                         "maxNpcLineChars=34\n" +
+                        "maxNpcLines=3\n" +
+                        "# クエスト画面の本文が枠外へ出る場合は小さくしてください。\n" +
+                        "maxQuestLineChars=27\n" +
+                        "maxQuestLines=24\n" +
                         "chatTranslationPrefix=[翻訳]\n" +
                         "protectPlayerName=true\n" +
                         "# If true, untranslated English strings are also written to seen_english.log.\n" +
@@ -113,6 +117,9 @@ public final class Translator {
             ensureConfigDefault("translatePatchouliBooks", "true");
             ensureConfigDefault("patchouliSafeMode", "true");
             ensureConfigDefault("maxNpcLineChars", "34");
+            ensureConfigDefault("maxNpcLines", "3");
+            ensureConfigDefault("maxQuestLineChars", "27");
+            ensureConfigDefault("maxQuestLines", "24");
             ensureConfigDefault("chatTranslationPrefix", "[翻訳]");
             ensureConfigDefault("protectPlayerName", "true");
             ensureConfigDefault("logSeenEnglish", "true");
@@ -531,19 +538,83 @@ public final class Translator {
     private static String fitReplacementForCurrentScreen(String original, String translated) {
         if (translated == null) return null;
         String screenName = currentScreenName();
-        if (!screenName.equals("com.feywild.quest_giver.screen.DisplayQuestScreen")) return translated;
-        // Feywild quest dialogue is drawn in a fixed-width area. Japanese DeepL output can be
-        // much longer than the original line and run through the choice buttons. Keep each
-        // rendered line inside the dialogue box. The full translation remains in cache/logs.
-        int max = parseInt(CONFIG.getProperty("maxNpcLineChars", "34"), 34);
-        if (max < 16) max = 16;
-        if (translated.length() <= max) return translated;
-        String cut = translated.substring(0, Math.max(1, max - 1));
-        // Avoid ending immediately after a color code marker.
-        if (cut.endsWith("§") && cut.length() > 1) cut = cut.substring(0, cut.length() - 1);
-        String fitted = cut + "…";
-        logSeen("npc.dialogue.fit", translated + " -> " + fitted);
-        return fitted;
+
+        // v1.5.4: fixed-width dialogue/quest screens need real multi-line wrapping.
+        // Returning a string with 
+ is handled by FontMixin, which draws each line separately.
+        if (screenName.equals("com.feywild.quest_giver.screen.DisplayQuestScreen")) {
+            int maxChars = parseInt(CONFIG.getProperty("maxNpcLineChars", "34"), 34);
+            int maxLines = parseInt(CONFIG.getProperty("maxNpcLines", "3"), 3);
+            String fitted = wrapAndLimitJapanese(translated, maxChars, maxLines);
+            if (!translated.equals(fitted)) logSeen("npc.dialogue.wrap", translated + " -> " + fitted.replace("
+", " / "));
+            return fitted;
+        }
+
+        if (isQuestLikeScreen(screenName)) {
+            int maxChars = parseInt(CONFIG.getProperty("maxQuestLineChars", "27"), 27);
+            int maxLines = parseInt(CONFIG.getProperty("maxQuestLines", "24"), 24);
+            String fitted = wrapAndLimitJapanese(translated, maxChars, maxLines);
+            if (!translated.equals(fitted)) logSeen("quest.text.wrap", translated + " -> " + fitted.replace("
+", " / "));
+            return fitted;
+        }
+
+        return translated;
+    }
+
+    private static boolean isQuestLikeScreen(String screenName) {
+        if (screenName == null) return false;
+        String s = screenName.toLowerCase(java.util.Locale.ROOT);
+        return s.contains("quest") || s.contains("ftbquests") || s.contains("quest_giver");
+    }
+
+    private static String wrapAndLimitJapanese(String translated, int maxChars, int maxLines) {
+        if (translated == null) return null;
+        maxChars = Math.max(12, maxChars);
+        maxLines = Math.max(1, maxLines);
+        String clean = translated.replace("", " ").replace("
+", " ").replaceAll("\s+", " ").trim();
+        if (clean.isEmpty()) return clean;
+
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        int visible = 0;
+        int i = 0;
+        while (i < clean.length()) {
+            char ch = clean.charAt(i);
+            // Preserve Minecraft color codes without counting them as visible width.
+            if (ch == '§' && i + 1 < clean.length()) {
+                line.append(ch).append(clean.charAt(i + 1));
+                i += 2;
+                continue;
+            }
+            line.append(ch);
+            visible++;
+            boolean naturalBreak = ch == '。' || ch == '、' || ch == '！' || ch == '？' || ch == '!' || ch == '?' || ch == '.';
+            if (visible >= maxChars || (naturalBreak && visible >= Math.max(10, maxChars - 8))) {
+                lines.add(line.toString().trim());
+                line.setLength(0);
+                visible = 0;
+                while (i + 1 < clean.length() && clean.charAt(i + 1) == ' ') i++;
+                if (lines.size() >= maxLines) break;
+            }
+            i++;
+        }
+        if (line.length() > 0 && lines.size() < maxLines) lines.add(line.toString().trim());
+        if (lines.isEmpty()) lines.add(clean);
+
+        if (i < clean.length() - 1 && !lines.isEmpty()) {
+            int last = lines.size() - 1;
+            String l = lines.get(last);
+            if (l.length() > 1) {
+                // Avoid cutting directly after a color marker.
+                if (l.endsWith("§")) l = l.substring(0, l.length() - 1);
+                lines.set(last, l + "…");
+            }
+        }
+        return String.join("
+", lines);
     }
 
     public static void observeText(String source, String text) {

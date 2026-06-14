@@ -24,13 +24,13 @@ public abstract class FontMixin {
     @Inject(method = "draw(Lcom/mojang/blaze3d/vertex/PoseStack;Ljava/lang/String;FFI)I", at = @At("HEAD"), cancellable = true, require = 0)
     private void dat$drawString(PoseStack poseStack, String text, float x, float y, int color, CallbackInfoReturnable<Integer> cir) {
         String translated = Translator.translateForDraw("font.draw.string", text);
-        if (Translator.isDifferent(text, translated)) cir.setReturnValue(this.draw(poseStack, translated, x, y, color));
+        if (Translator.isDifferent(text, translated)) cir.setReturnValue(dat$drawMultiline(poseStack, translated, x, y, color, false));
     }
 
     @Inject(method = "drawShadow(Lcom/mojang/blaze3d/vertex/PoseStack;Ljava/lang/String;FFI)I", at = @At("HEAD"), cancellable = true, require = 0)
     private void dat$drawShadowString(PoseStack poseStack, String text, float x, float y, int color, CallbackInfoReturnable<Integer> cir) {
         String translated = Translator.translateForDraw("font.drawShadow.string", text);
-        if (Translator.isDifferent(text, translated)) cir.setReturnValue(this.drawShadow(poseStack, translated, x, y, color));
+        if (Translator.isDifferent(text, translated)) cir.setReturnValue(dat$drawMultiline(poseStack, translated, x, y, color, true));
     }
 
     @Inject(method = "draw(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/network/chat/Component;FFI)I", at = @At("HEAD"), cancellable = true, require = 0)
@@ -38,7 +38,7 @@ public abstract class FontMixin {
         if (component == null) return;
         String text = component.getString();
         String translated = Translator.translateForDraw("font.draw.component", text);
-        if (Translator.isDifferent(text, translated)) cir.setReturnValue(this.draw(poseStack, translated, x, y, color));
+        if (Translator.isDifferent(text, translated)) cir.setReturnValue(dat$drawMultiline(poseStack, translated, x, y, color, false));
     }
 
     @Inject(method = "drawShadow(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/network/chat/Component;FFI)I", at = @At("HEAD"), cancellable = true, require = 0)
@@ -46,7 +46,7 @@ public abstract class FontMixin {
         if (component == null) return;
         String text = component.getString();
         String translated = Translator.translateForDraw("font.drawShadow.component", text);
-        if (Translator.isDifferent(text, translated)) cir.setReturnValue(this.drawShadow(poseStack, translated, x, y, color));
+        if (Translator.isDifferent(text, translated)) cir.setReturnValue(dat$drawMultiline(poseStack, translated, x, y, color, true));
     }
 
     @Inject(method = "draw(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/util/FormattedCharSequence;FFI)I", at = @At("HEAD"), cancellable = true, require = 0)
@@ -54,7 +54,7 @@ public abstract class FontMixin {
         String translated = Translator.translateForFormattedDraw("font.draw.formatted", sequence, x, y);
         if (translated != null) {
             int fixedColor = Translator.colorForTranslatedFormatted("font.draw.formatted", color);
-            cir.setReturnValue(this.draw(poseStack, translated, x, y, fixedColor));
+            cir.setReturnValue(dat$drawMultiline(poseStack, translated, x, y, fixedColor, false));
         }
     }
 
@@ -63,7 +63,7 @@ public abstract class FontMixin {
         String translated = Translator.translateForFormattedDraw("font.drawShadow.formatted", sequence, x, y);
         if (translated != null) {
             int fixedColor = Translator.colorForTranslatedFormatted("font.drawShadow.formatted", color);
-            cir.setReturnValue(this.drawShadow(poseStack, translated, x, y, fixedColor));
+            cir.setReturnValue(dat$drawMultiline(poseStack, translated, x, y, fixedColor, true));
         }
     }
 
@@ -73,7 +73,7 @@ public abstract class FontMixin {
     private void dat$drawInBatchString(String text, float x, float y, int color, boolean dropShadow, Matrix4f matrix, MultiBufferSource buffer, boolean seeThrough, int backgroundColor, int packedLight, CallbackInfoReturnable<Integer> cir) {
         String translated = Translator.translateForDraw("font.drawInBatch.string", text);
         if (Translator.isDifferent(text, translated)) {
-            cir.setReturnValue(this.drawInBatch(translated, x, y, color, dropShadow, matrix, buffer, seeThrough, backgroundColor, packedLight));
+            cir.setReturnValue(dat$drawInBatchMultiline(translated, x, y, color, dropShadow, matrix, buffer, seeThrough, backgroundColor, packedLight));
         }
     }
 
@@ -83,7 +83,7 @@ public abstract class FontMixin {
         String text = component.getString();
         String translated = Translator.translateForDraw("font.drawInBatch.component", text);
         if (Translator.isDifferent(text, translated)) {
-            cir.setReturnValue(this.drawInBatch(translated, x, y, color, dropShadow, matrix, buffer, seeThrough, backgroundColor, packedLight));
+            cir.setReturnValue(dat$drawInBatchMultiline(translated, x, y, color, dropShadow, matrix, buffer, seeThrough, backgroundColor, packedLight));
         }
     }
 
@@ -92,8 +92,39 @@ public abstract class FontMixin {
         String translated = Translator.translateForFormattedDraw("font.drawInBatch.formatted", sequence, x, y);
         if (translated != null) {
             int fixedColor = Translator.colorForTranslatedFormatted("font.drawInBatch.formatted", color);
-            cir.setReturnValue(this.drawInBatch(translated, x, y, fixedColor, dropShadow, matrix, buffer, seeThrough, backgroundColor, packedLight));
+            cir.setReturnValue(dat$drawInBatchMultiline(translated, x, y, fixedColor, dropShadow, matrix, buffer, seeThrough, backgroundColor, packedLight));
         }
     }
+
+    private int dat$drawMultiline(PoseStack poseStack, String text, float x, float y, int color, boolean shadow) {
+        if (text == null || text.indexOf('\n') < 0) {
+            return shadow ? this.drawShadow(poseStack, text, x, y, color) : this.draw(poseStack, text, x, y, color);
+        }
+        int ret = 0;
+        float yy = y;
+        for (String line : text.split("\\n", -1)) {
+            if (!line.isEmpty()) {
+                ret = shadow ? this.drawShadow(poseStack, line, x, yy, color) : this.draw(poseStack, line, x, yy, color);
+            }
+            yy += 10.0F;
+        }
+        return ret;
+    }
+
+    private int dat$drawInBatchMultiline(String text, float x, float y, int color, boolean dropShadow, Matrix4f matrix, MultiBufferSource buffer, boolean seeThrough, int backgroundColor, int packedLight) {
+        if (text == null || text.indexOf('\n') < 0) {
+            return this.drawInBatch(text, x, y, color, dropShadow, matrix, buffer, seeThrough, backgroundColor, packedLight);
+        }
+        int ret = 0;
+        float yy = y;
+        for (String line : text.split("\\n", -1)) {
+            if (!line.isEmpty()) {
+                ret = this.drawInBatch(line, x, yy, color, dropShadow, matrix, buffer, seeThrough, backgroundColor, packedLight);
+            }
+            yy += 10.0F;
+        }
+        return ret;
+    }
+
 
 }
