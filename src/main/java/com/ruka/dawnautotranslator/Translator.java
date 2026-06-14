@@ -540,14 +540,12 @@ public final class Translator {
         String screenName = currentScreenName();
 
         // v1.5.4: fixed-width dialogue/quest screens need real multi-line wrapping.
-        // Returning a string with 
- is handled by FontMixin, which draws each line separately.
+        // Returning a string with \n is handled by FontMixin, which draws each line separately.
         if (screenName.equals("com.feywild.quest_giver.screen.DisplayQuestScreen")) {
             int maxChars = parseInt(CONFIG.getProperty("maxNpcLineChars", "34"), 34);
             int maxLines = parseInt(CONFIG.getProperty("maxNpcLines", "3"), 3);
             String fitted = wrapAndLimitJapanese(translated, maxChars, maxLines);
-            if (!translated.equals(fitted)) logSeen("npc.dialogue.wrap", translated + " -> " + fitted.replace("
-", " / "));
+            if (!translated.equals(fitted)) logSeen("npc.dialogue.wrap", translated + " -> " + fitted.replace("\n", " / "));
             return fitted;
         }
 
@@ -555,8 +553,7 @@ public final class Translator {
             int maxChars = parseInt(CONFIG.getProperty("maxQuestLineChars", "27"), 27);
             int maxLines = parseInt(CONFIG.getProperty("maxQuestLines", "24"), 24);
             String fitted = wrapAndLimitJapanese(translated, maxChars, maxLines);
-            if (!translated.equals(fitted)) logSeen("quest.text.wrap", translated + " -> " + fitted.replace("
-", " / "));
+            if (!translated.equals(fitted)) logSeen("quest.text.wrap", translated + " -> " + fitted.replace("\n", " / "));
             return fitted;
         }
 
@@ -573,8 +570,7 @@ public final class Translator {
         if (translated == null) return null;
         maxChars = Math.max(12, maxChars);
         maxLines = Math.max(1, maxLines);
-        String clean = translated.replace("", " ").replace("
-", " ").replaceAll("\s+", " ").trim();
+        String clean = translated.replace("\r", " ").replace("\n", " ").replaceAll("\\s+", " ").trim();
         if (clean.isEmpty()) return clean;
 
         java.util.List<String> lines = new java.util.ArrayList<>();
@@ -613,10 +609,8 @@ public final class Translator {
                 lines.set(last, l + "…");
             }
         }
-        return String.join("
-", lines);
+        return String.join("\n", lines);
     }
-
     public static void observeText(String source, String text) {
         observeTextAt(source, text, Float.NaN, Float.NaN);
     }
