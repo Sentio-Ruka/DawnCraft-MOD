@@ -78,6 +78,11 @@ public final class Translator {
                         "translateQuests=true\n" +
                         "translateJei=true\n" +
                         "translateNpc=true\n" +
+                        "# Patchouli/book-like GUIs can break if every tiny layout fragment is replaced.\n" +
+                        "translatePatchouliBooks=true\n" +
+                        "patchouliSafeMode=true\n" +
+                        "# NPC会話の翻訳が横にはみ出る場合は小さくしてください。\n" +
+                        "maxNpcLineChars=34\n" +
                         "chatTranslationPrefix=[翻訳]\n" +
                         "protectPlayerName=true\n" +
                         "# If true, untranslated English strings are also written to seen_english.log.\n" +
@@ -105,6 +110,9 @@ public final class Translator {
             ensureConfigDefault("translateQuests", "true");
             ensureConfigDefault("translateJei", "true");
             ensureConfigDefault("translateNpc", "true");
+            ensureConfigDefault("translatePatchouliBooks", "true");
+            ensureConfigDefault("patchouliSafeMode", "true");
+            ensureConfigDefault("maxNpcLineChars", "34");
             ensureConfigDefault("chatTranslationPrefix", "[翻訳]");
             ensureConfigDefault("protectPlayerName", "true");
             ensureConfigDefault("logSeenEnglish", "true");
@@ -166,6 +174,16 @@ public final class Translator {
         String cached = CACHE.getProperty(original);
         if (cached != null && !cached.isBlank()) return decodeEscapes(cached);
         observeText(source, original);
+
+        // v1.5.2: Quest selection overlays render labels as raw strings.
+        // Do not send unknown selection/button labels to DeepL here, because replacing
+        // button-like text can interfere with that custom UI. Manual dictionary entries
+        // above are still allowed, so known quest labels can be safely translated.
+        String screenName = currentScreenName();
+        if (screenName.equals("com.feywild.quest_giver.screen.SelectQuestScreen")) {
+            return original;
+        }
+
         maybeQueueOnlineTranslation(original);
         return original;
     }
@@ -208,6 +226,7 @@ public final class Translator {
         if (screen.contains("jei") || screen.contains("mezz.jei")) return Boolean.parseBoolean(CONFIG.getProperty("translateJei", "true"));
         if (screen.contains("quest") || screen.contains("ftbquests")) return Boolean.parseBoolean(CONFIG.getProperty("translateQuests", "true"));
         if (screen.contains("dialog") || screen.contains("npc") || screen.contains("conversation")) return Boolean.parseBoolean(CONFIG.getProperty("translateNpc", "true"));
+        if (screen.contains("patchouli") || screen.contains("book") || screen.contains("guide") || screen.contains("lexicon")) return Boolean.parseBoolean(CONFIG.getProperty("translatePatchouliBooks", "true"));
         return Boolean.parseBoolean(CONFIG.getProperty("translateTooltips", "true"));
     }
 
@@ -413,12 +432,61 @@ public final class Translator {
     }
 
 
+
+    public static boolean isBookLikeScreen() {
+        String screen = currentScreenName().toLowerCase(java.util.Locale.ROOT);
+        return screen.contains("patchouli") || screen.contains("book") || screen.contains("guide") || screen.contains("lexicon");
+    }
+
+    private static boolean shouldSkipBookFragment(String s) {
+        if (s == null) return true;
+        String t = s.trim();
+        if (t.length() < 12) return true;
+        // Patchouli sometimes draws isolated layout fragments like "the" or "bonuses.".
+        // Translating those tiny fragments causes unreadable partial text on the page.
+        int letters = 0;
+        int spaces = 0;
+        for (int i = 0; i < t.length(); i++) {
+            char c = t.charAt(i);
+            if (Character.isLetter(c)) letters++;
+            if (Character.isWhitespace(c)) spaces++;
+        }
+        if (letters < 8) return true;
+        if (spaces == 0 && t.length() < 18) return true;
+        return false;
+    }
+
+    public static int colorForTranslatedFormatted(String source, int originalColor) {
+        if (!isBookLikeScreen()) return originalColor;
+        // Some book GUIs pass white/transparent colors while their background expects dark ink.
+        // Force translated replacement text to a readable dark color.
+        int rgb = originalColor & 0x00FFFFFF;
+        int alpha = originalColor & 0xFF000000;
+        if (alpha == 0) alpha = 0xFF000000;
+        if (rgb == 0xFFFFFF || rgb == 0xF0F0F0 || rgb == 0xE0E0E0 || rgb == 0) {
+            return alpha | 0x3F3F3F;
+        }
+        return originalColor;
+    }
+
     public static String translateForFormattedDraw(String source, FormattedCharSequence sequence, float x, float y) {
         if (!enabled || sequence == null) return null;
         String text = formattedToString(sequence);
         if (text == null) return null;
         String original = text.trim();
         if (original.isEmpty()) return null;
+
+        // v1.5.1.1: Patchouli/book-style pages often split text into tiny layout fragments.
+        // Replacing fragments like "the" or "bonuses." breaks wrapping and makes text unreadable.
+        // Only allow replacement for substantial lines; short fragments are observed/queued only.
+        if (isBookLikeScreen()) {
+            observeTextAt(source, original, x, y);
+            if (!Boolean.parseBoolean(CONFIG.getProperty("translatePatchouliBooks", "true"))) return null;
+            if (Boolean.parseBoolean(CONFIG.getProperty("patchouliSafeMode", "true")) && shouldSkipBookFragment(original)) {
+                maybeQueueOnlineTranslation(original);
+                return null;
+            }
+        }
 
         // v1.4.2 safety: Feywild quest-giver screens have selectable UI elements.
         // Translate only the main dialogue body on DisplayQuestScreen; leave SelectQuestScreen
@@ -443,7 +511,7 @@ public final class Translator {
         String manual = DICT.getProperty(original);
         if (manual != null && !manual.isBlank()) {
             logSeen((source == null ? "formatted" : source) + ".replace", original + " -> " + manual);
-            return manual;
+            return fitReplacementForCurrentScreen(original, manual);
         }
 
         String cached = CACHE.getProperty(original);
@@ -451,13 +519,31 @@ public final class Translator {
             String decoded = decodeEscapes(cached);
             decoded = applyChatFormattingHints(original, decoded);
             logSeen((source == null ? "formatted" : source) + ".cacheReplace", original + " -> " + decoded);
-            return decoded;
+            return fitReplacementForCurrentScreen(original, decoded);
         }
 
         // Quest/NPC/tooltip/JEI formatted text often reaches Minecraft as FormattedCharSequence only.
         // Queue it for DeepL now; the next render/cache hit can replace it in-place.
         maybeQueueOnlineTranslation(original);
         return null;
+    }
+
+    private static String fitReplacementForCurrentScreen(String original, String translated) {
+        if (translated == null) return null;
+        String screenName = currentScreenName();
+        if (!screenName.equals("com.feywild.quest_giver.screen.DisplayQuestScreen")) return translated;
+        // Feywild quest dialogue is drawn in a fixed-width area. Japanese DeepL output can be
+        // much longer than the original line and run through the choice buttons. Keep each
+        // rendered line inside the dialogue box. The full translation remains in cache/logs.
+        int max = parseInt(CONFIG.getProperty("maxNpcLineChars", "34"), 34);
+        if (max < 16) max = 16;
+        if (translated.length() <= max) return translated;
+        String cut = translated.substring(0, Math.max(1, max - 1));
+        // Avoid ending immediately after a color code marker.
+        if (cut.endsWith("§") && cut.length() > 1) cut = cut.substring(0, cut.length() - 1);
+        String fitted = cut + "…";
+        logSeen("npc.dialogue.fit", translated + " -> " + fitted);
+        return fitted;
     }
 
     public static void observeText(String source, String text) {
@@ -542,6 +628,12 @@ public final class Translator {
         putDefault("Confirm", "決定");
         putDefault("Items", "アイテム");
         putDefault("Skills", "スキル");
+
+        // Quest selection labels observed in DawnCraft/Feywild quest-giver UI.
+        // These are translated by fixed dictionary only to avoid breaking custom buttons.
+        putDefault("First Assignment", "最初の課題");
+        putDefault("Finding Pillagers", "略奪者を探す");
+        putDefault("Reforging and Socketing", "鍛造とソケット");
 
         // DawnCraft Classes - names
         putDefault("Warrior", "戦士");
